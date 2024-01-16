@@ -50,6 +50,28 @@ func LoadSignerVerifier(privateKey crypto.PrivateKey, hashFunc crypto.Hash) (Sig
 	return nil, errors.New("unsupported public key type")
 }
 
+// LoadSignerVerifierWithOpts returns a signature.SignerVerifier based on the
+// algorithm of the private key provided and the user's choice.
+func LoadSignerVerifierWithOpts(privateKey crypto.PrivateKey, hashFunc crypto.Hash, opts ...SignerVerifierOption) (SignerVerifier, error) {
+	o := makeSignerVerifierOpts(opts...)
+
+	switch pk := privateKey.(type) {
+	case *rsa.PrivateKey:
+		if o.rsaPSSOptions != nil {
+			return LoadRSAPSSSignerVerifier(pk, hashFunc, o.rsaPSSOptions)
+		}
+		return LoadRSAPKCS1v15SignerVerifier(pk, hashFunc)
+	case *ecdsa.PrivateKey:
+		return LoadECDSASignerVerifier(pk, hashFunc)
+	case ed25519.PrivateKey:
+		if o.useED25519ph {
+			return LoadED25519phSignerVerifier(pk)
+		}
+		return LoadED25519SignerVerifier(pk)
+	}
+	return nil, errors.New("unsupported public key type")
+}
+
 // LoadSignerVerifierFromPEMFile returns a signature.SignerVerifier based on the algorithm of the private key
 // in the file. The SignerVerifier will use the hash function specified when computing digests.
 //
@@ -66,4 +88,18 @@ func LoadSignerVerifierFromPEMFile(path string, hashFunc crypto.Hash, pf cryptou
 		return nil, err
 	}
 	return LoadSignerVerifier(priv, hashFunc)
+}
+
+// LoadSignerVerifierFromPEMFileWithOpts returns a signature.SignerVerifier based on the algorithm of the private key
+// in the file. The SignerVerifier will use the hash function specified when computing digests.
+func LoadSignerVerifierFromPEMFileWithOpts(path string, hashFunc crypto.Hash, pf cryptoutils.PassFunc, opts ...SignerVerifierOption) (SignerVerifier, error) {
+	fileBytes, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, err
+	}
+	priv, err := cryptoutils.UnmarshalPEMToPrivateKey(fileBytes, pf)
+	if err != nil {
+		return nil, err
+	}
+	return LoadSignerVerifierWithOpts(priv, hashFunc, opts...)
 }
