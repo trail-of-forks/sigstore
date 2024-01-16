@@ -18,6 +18,7 @@ package signature
 import (
 	"context"
 	"crypto"
+	"crypto/rsa"
 	"io"
 
 	"github.com/sigstore/sigstore/pkg/signature/options"
@@ -54,4 +55,31 @@ type SignOption interface {
 type VerifyOption interface {
 	RPCOption
 	MessageOption
+}
+
+type signerVerifierOpts struct {
+	useED25519ph  bool
+	rsaPSSOptions *rsa.PSSOptions
+}
+
+type SignerVerifierOption func(*signerVerifierOpts)
+
+func WithED25519ph() SignerVerifierOption {
+	return func(o *signerVerifierOpts) {
+		o.useED25519ph = true
+	}
+}
+
+func WithRSAPSS(opts *rsa.PSSOptions) SignerVerifierOption {
+	return func(o *signerVerifierOpts) {
+		o.rsaPSSOptions = opts
+	}
+}
+
+func makeSignerVerifierOpts(opts ...SignerVerifierOption) *signerVerifierOpts {
+	o := &signerVerifierOpts{}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
 }

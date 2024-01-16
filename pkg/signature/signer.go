@@ -55,16 +55,21 @@ func (s SignerOpts) HashFunc() crypto.Hash {
 
 // LoadSigner returns a signature.Signer based on the algorithm of the private key
 // provided.
-//
-// If privateKey is an RSA key, a RSAPKCS1v15Signer will be returned. If a
-// RSAPSSSigner is desired instead, use the LoadRSAPSSSigner() method directly.
-func LoadSigner(privateKey crypto.PrivateKey, hashFunc crypto.Hash) (Signer, error) {
+func LoadSigner(privateKey crypto.PrivateKey, hashFunc crypto.Hash, opts ...SignerVerifierOption) (Signer, error) {
+	o := makeSignerVerifierOpts(opts...)
+
 	switch pk := privateKey.(type) {
 	case *rsa.PrivateKey:
+		if o.rsaPSSOptions != nil {
+			return LoadRSAPSSSigner(pk, hashFunc, o.rsaPSSOptions)
+		}
 		return LoadRSAPKCS1v15Signer(pk, hashFunc)
 	case *ecdsa.PrivateKey:
 		return LoadECDSASigner(pk, hashFunc)
 	case ed25519.PrivateKey:
+		if o.useED25519ph {
+			return LoadED25519phSigner(pk)
+		}
 		return LoadED25519Signer(pk)
 	}
 	return nil, errors.New("unsupported public key type")
@@ -72,11 +77,7 @@ func LoadSigner(privateKey crypto.PrivateKey, hashFunc crypto.Hash) (Signer, err
 
 // LoadSignerFromPEMFile returns a signature.Signer based on the algorithm of the private key
 // in the file. The Signer will use the hash function specified when computing digests.
-//
-// If key is an RSA key, a RSAPKCS1v15Signer will be returned. If a
-// RSAPSSSigner is desired instead, use the LoadRSAPSSSigner() and
-// cryptoutils.UnmarshalPEMToPrivateKey() methods directly.
-func LoadSignerFromPEMFile(path string, hashFunc crypto.Hash, pf cryptoutils.PassFunc) (Signer, error) {
+func LoadSignerFromPEMFile(path string, hashFunc crypto.Hash, pf cryptoutils.PassFunc, opts ...SignerVerifierOption) (Signer, error) {
 	fileBytes, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
@@ -85,5 +86,5 @@ func LoadSignerFromPEMFile(path string, hashFunc crypto.Hash, pf cryptoutils.Pas
 	if err != nil {
 		return nil, err
 	}
-	return LoadSigner(priv, hashFunc)
+	return LoadSigner(priv, hashFunc, opts...)
 }

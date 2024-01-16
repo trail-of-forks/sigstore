@@ -36,16 +36,21 @@ type Verifier interface {
 
 // LoadVerifier returns a signature.Verifier based on the algorithm of the public key
 // provided that will use the hash function specified when computing digests.
-//
-// If publicKey is an RSA key, a RSAPKCS1v15Verifier will be returned. If a
-// RSAPSSVerifier is desired instead, use the LoadRSAPSSVerifier() method directly.
-func LoadVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash) (Verifier, error) {
+func LoadVerifier(publicKey crypto.PublicKey, hashFunc crypto.Hash, opts ...SignerVerifierOption) (Verifier, error) {
+	o := makeSignerVerifierOpts(opts...)
+
 	switch pk := publicKey.(type) {
 	case *rsa.PublicKey:
+		if o.rsaPSSOptions != nil {
+			return LoadRSAPSSVerifier(pk, hashFunc, o.rsaPSSOptions)
+		}
 		return LoadRSAPKCS1v15Verifier(pk, hashFunc)
 	case *ecdsa.PublicKey:
 		return LoadECDSAVerifier(pk, hashFunc)
 	case ed25519.PublicKey:
+		if o.useED25519ph {
+			return LoadED25519phVerifier(pk)
+		}
 		return LoadED25519Verifier(pk)
 	}
 	return nil, errors.New("unsupported public key type")
@@ -82,10 +87,7 @@ func LoadUnsafeVerifier(publicKey crypto.PublicKey) (Verifier, error) {
 
 // LoadVerifierFromPEMFile returns a signature.Verifier based on the contents of a
 // file located at path. The Verifier wil use the hash function specified when computing digests.
-//
-// If the publickey is an RSA key, a RSAPKCS1v15Verifier will be returned. If a
-// RSAPSSVerifier is desired instead, use the LoadRSAPSSVerifier() and cryptoutils.UnmarshalPEMToPublicKey() methods directly.
-func LoadVerifierFromPEMFile(path string, hashFunc crypto.Hash) (Verifier, error) {
+func LoadVerifierFromPEMFile(path string, hashFunc crypto.Hash, opts ...SignerVerifierOption) (Verifier, error) {
 	fileBytes, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return nil, err
@@ -96,5 +98,5 @@ func LoadVerifierFromPEMFile(path string, hashFunc crypto.Hash) (Verifier, error
 		return nil, err
 	}
 
-	return LoadVerifier(pubKey, hashFunc)
+	return LoadVerifier(pubKey, hashFunc, opts...)
 }
