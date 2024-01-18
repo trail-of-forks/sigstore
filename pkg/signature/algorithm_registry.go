@@ -22,25 +22,41 @@ import (
 	"crypto/elliptic"
 	"crypto/rsa"
 	"fmt"
-	"github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+
+	v1 "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 )
 
+// PublicKeyType represents the public key algorithm for a given signature algorithm.
 type PublicKeyType uint
 
 const (
-	RSA PublicKeyType = iota
-	ECDSA
-	ED25519
+	RSA     PublicKeyType = iota // RSA public key
+	ECDSA                        // ECDSA public key
+	ED25519                      // ED25519 public key
 )
 
+// RSAKeySize represents the size of an RSA public key.
 type RSAKeySize int
 
+// AlgorithmDetails exposes relevant information for a given signature algorithm.
 type AlgorithmDetails interface {
-	GetKnownAlgorithm() v1.KnownSignatureAlgorithm
+	// GetSignatureAlgorithm returns the algorithm registry.
+	GetSignatureAlgorithm() v1.KnownSignatureAlgorithm
+
+	// GetKeyType returns the public key algorithm for the given signature algorithm.
 	GetKeyType() PublicKeyType
+
+	// GetHashType returns the hash algorithm for a given signature algorithm.
 	GetHashType() crypto.Hash
+
+	// GetRSAKeySize returns the key size if the public key algorithm is RSA.
+	// Otherwise, an error is returned.
 	GetRSAKeySize() (RSAKeySize, error)
+
+	// GetECDSACurve returns the curve if the public key algorithm is ECDSA.
+	// Otherwise, an error is returned.
 	GetECDSACurve() (*elliptic.Curve, error)
+
 	checkKey(crypto.PublicKey) bool
 	checkHash(crypto.Hash) bool
 }
@@ -50,9 +66,10 @@ type algorithmDetailsImpl struct {
 	keyType        PublicKeyType
 	hashType       crypto.Hash
 	extraKeyParams interface{}
+	flagValue      string
 }
 
-func (a algorithmDetailsImpl) GetKnownAlgorithm() v1.KnownSignatureAlgorithm {
+func (a algorithmDetailsImpl) GetSignatureAlgorithm() v1.KnownSignatureAlgorithm {
 	return a.knownAlgorithm
 }
 
@@ -66,7 +83,7 @@ func (a algorithmDetailsImpl) GetHashType() crypto.Hash {
 
 func (a algorithmDetailsImpl) GetRSAKeySize() (RSAKeySize, error) {
 	if a.keyType != RSA {
-		return 0, fmt.Errorf("unable to retrieve RSA key size for key type: %s", a.keyType)
+		return 0, fmt.Errorf("unable to retrieve RSA key size for key type: %T", a.keyType)
 	}
 	rsaKeySize, ok := a.extraKeyParams.(RSAKeySize)
 	if !ok {
@@ -77,7 +94,7 @@ func (a algorithmDetailsImpl) GetRSAKeySize() (RSAKeySize, error) {
 
 func (a algorithmDetailsImpl) GetECDSACurve() (*elliptic.Curve, error) {
 	if a.keyType != ECDSA {
-		return nil, fmt.Errorf("unable to retrieve ECDSA curve for key type: %s", a.keyType)
+		return nil, fmt.Errorf("unable to retrieve ECDSA curve for key type: %T", a.keyType)
 	}
 	ecdsaCurve, ok := a.extraKeyParams.(elliptic.Curve)
 	if !ok {
@@ -120,20 +137,26 @@ func (a algorithmDetailsImpl) checkHash(hashType crypto.Hash) bool {
 }
 
 var algorithmDetails = []algorithmDetailsImpl{
-	{v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_2048_SHA256, RSA, crypto.SHA256, RSAKeySize(2048)},
-	{v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_3072_SHA256, RSA, crypto.SHA256, RSAKeySize(3072)},
-	{v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_4096_SHA256, RSA, crypto.SHA256, RSAKeySize(4096)},
-	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256, ECDSA, crypto.SHA256, elliptic.P256()},
-	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_384_NISTP384, ECDSA, crypto.SHA384, elliptic.P384()},
-	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_512_NISTP521, ECDSA, crypto.SHA512, elliptic.P521()},
-	{v1.KnownSignatureAlgorithm_ED25519, ED25519, crypto.Hash(0), nil},
-	{v1.KnownSignatureAlgorithm_ED25519_PH, ED25519, crypto.Hash(0), nil},
+	{v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_2048_SHA256, RSA, crypto.SHA256, RSAKeySize(2048), "rsa-sign-pkcs1-2048-sha256"},
+	{v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_3072_SHA256, RSA, crypto.SHA256, RSAKeySize(3072), "rsa-sign-pkcs1-3072-sha256"},
+	{v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_4096_SHA256, RSA, crypto.SHA256, RSAKeySize(4096), "rsa-sign-pkcs1-4096-sha256"},
+	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256, ECDSA, crypto.SHA256, elliptic.P256(), "ecdsa-sha2-256-nistp256"},
+	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_384_NISTP384, ECDSA, crypto.SHA384, elliptic.P384(), "ecdsa-sha2-384-nistp384"},
+	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_512_NISTP521, ECDSA, crypto.SHA512, elliptic.P521(), "ecdsa-sha2-512-nistp521"},
+	{v1.KnownSignatureAlgorithm_ED25519, ED25519, crypto.Hash(0), nil, "ed25519"},
+	{v1.KnownSignatureAlgorithm_ED25519_PH, ED25519, crypto.Hash(0), nil, "ed25519-ph"},
 }
 
-type AlgorithmRegistry struct {
+// AlgorithmRegistryConfig represents a set of permitted algorithms for a given Sigstore service or component.
+//
+// Individual services may wish to restrict what algorithms are allowed to a subset of what is covered in the algorithm
+// registry (represented by v1.KnownSignatureAlgorithm).
+type AlgorithmRegistryConfig struct {
 	permittedAlgorithms []AlgorithmDetails
 }
 
+// GetAlgorithmDetails retrieves a set of details for a given v1.KnownSignatureAlgorithm flag that allows users to
+// introspect the public key algorithm, hash algorithm and more.
 func GetAlgorithmDetails(knownSignatureAlgorithm v1.KnownSignatureAlgorithm) (AlgorithmDetails, error) {
 	for _, detail := range algorithmDetails {
 		if detail.knownAlgorithm == knownSignatureAlgorithm {
@@ -143,8 +166,9 @@ func GetAlgorithmDetails(knownSignatureAlgorithm v1.KnownSignatureAlgorithm) (Al
 	return nil, fmt.Errorf("could not find algorithm details for known signature algorithm: %s", knownSignatureAlgorithm)
 }
 
-func NewAlgorithmRegistry(algorithmConfig []v1.KnownSignatureAlgorithm) (*AlgorithmRegistry, error) {
-	var permittedAlgorithms []AlgorithmDetails
+// NewAlgorithmRegistryConfig creates a new AlgorithmRegistryConfig for a set of permitted signature algorithms.
+func NewAlgorithmRegistryConfig(algorithmConfig []v1.KnownSignatureAlgorithm) (*AlgorithmRegistryConfig, error) {
+	permittedAlgorithms := make([]AlgorithmDetails, 0, len(algorithmDetails))
 	for _, algorithm := range algorithmConfig {
 		a, err := GetAlgorithmDetails(algorithm)
 		if err != nil {
@@ -152,14 +176,37 @@ func NewAlgorithmRegistry(algorithmConfig []v1.KnownSignatureAlgorithm) (*Algori
 		}
 		permittedAlgorithms = append(permittedAlgorithms, a)
 	}
-	return &AlgorithmRegistry{permittedAlgorithms: permittedAlgorithms}, nil
+	return &AlgorithmRegistryConfig{permittedAlgorithms: permittedAlgorithms}, nil
 }
 
-func (registry AlgorithmRegistry) CheckAlgorithm(key crypto.PublicKey, hash crypto.Hash) error {
-	for _, algorithm := range registry.permittedAlgorithms {
+// IsAlgorithmPermitted checks whether a given public key/hash algorithm combination is permitted by a registry config.
+func (registryConfig AlgorithmRegistryConfig) IsAlgorithmPermitted(key crypto.PublicKey, hash crypto.Hash) error {
+	for _, algorithm := range registryConfig.permittedAlgorithms {
 		if algorithm.checkKey(key) && algorithm.checkHash(hash) {
 			return nil
 		}
 	}
 	return fmt.Errorf("signing algorithm not permitted: %T, %s", key, hash)
+}
+
+// FormatSignatureAlgorithmFlag formats a v1.KnownSignatureAlgorithm to a string that conforms to the conventions of CLI
+// arguments that are used for Sigstore services.
+func FormatSignatureAlgorithmFlag(algorithm v1.KnownSignatureAlgorithm) (*string, error) {
+	for _, a := range algorithmDetails {
+		if a.GetSignatureAlgorithm() == algorithm {
+			return &a.flagValue, nil
+		}
+	}
+	return nil, fmt.Errorf("could not find matching flag for signature algorithm: %s", algorithm)
+}
+
+// ParseSignatureAlgorithmFlag parses a string produced by FormatSignatureAlgorithmFlag and returns the corresponding
+// v1.KnownSignatureAlgorithm value.
+func ParseSignatureAlgorithmFlag(flag string) (v1.KnownSignatureAlgorithm, error) {
+	for _, a := range algorithmDetails {
+		if a.flagValue == flag {
+			return a.GetSignatureAlgorithm(), nil
+		}
+	}
+	return v1.KnownSignatureAlgorithm_KNOWN_SIGNATURE_ALGORITHM_UNSPECIFIED, fmt.Errorf("could not find matching signature algorithm for flag: %s", flag)
 }
