@@ -106,7 +106,7 @@ func (a algorithmDetailsImpl) GetECDSACurve() (*elliptic.Curve, error) {
 func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) bool {
 	switch a.keyType {
 	case RSA:
-		rsaKey, ok := pubKey.(*rsa.PublicKey)
+		rsaKey, ok := pubKey.(rsa.PublicKey)
 		if !ok {
 			return false
 		}
@@ -116,7 +116,7 @@ func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) bool {
 		}
 		return rsaKey.Size() == int(keySize)
 	case ECDSA:
-		ecdsaKey, ok := pubKey.(*ecdsa.PublicKey)
+		ecdsaKey, ok := pubKey.(ecdsa.PublicKey)
 		if !ok {
 			return false
 		}
@@ -126,7 +126,7 @@ func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) bool {
 		}
 		return ecdsaKey.Curve == *curve
 	case ED25519:
-		_, ok := pubKey.(*ed25519.PublicKey)
+		_, ok := pubKey.(ed25519.PublicKey)
 		return ok
 	}
 	panic("unreachable")
