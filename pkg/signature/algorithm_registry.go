@@ -144,7 +144,7 @@ var algorithmDetails = []algorithmDetailsImpl{
 	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_384_NISTP384, ECDSA, crypto.SHA384, elliptic.P384(), "ecdsa-sha2-384-nistp384"},
 	{v1.KnownSignatureAlgorithm_ECDSA_SHA2_512_NISTP521, ECDSA, crypto.SHA512, elliptic.P521(), "ecdsa-sha2-512-nistp521"},
 	{v1.KnownSignatureAlgorithm_ED25519, ED25519, crypto.Hash(0), nil, "ed25519"},
-	{v1.KnownSignatureAlgorithm_ED25519_PH, ED25519, crypto.Hash(0), nil, "ed25519-ph"},
+	{v1.KnownSignatureAlgorithm_ED25519_PH, ED25519, crypto.SHA512, nil, "ed25519-ph"},
 }
 
 // AlgorithmRegistryConfig represents a set of permitted algorithms for a given Sigstore service or component.
