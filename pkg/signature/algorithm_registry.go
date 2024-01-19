@@ -180,13 +180,40 @@ func NewAlgorithmRegistryConfig(algorithmConfig []v1.KnownSignatureAlgorithm) (*
 }
 
 // IsAlgorithmPermitted checks whether a given public key/hash algorithm combination is permitted by a registry config.
-func (registryConfig AlgorithmRegistryConfig) IsAlgorithmPermitted(key crypto.PublicKey, hash crypto.Hash) error {
+func (registryConfig AlgorithmRegistryConfig) IsAlgorithmPermitted(key crypto.PublicKey, hash crypto.Hash) bool {
 	for _, algorithm := range registryConfig.permittedAlgorithms {
 		if algorithm.checkKey(key) && algorithm.checkHash(hash) {
-			return nil
+			return true
 		}
 	}
-	return fmt.Errorf("signing algorithm not permitted: %T, %s", key, hash)
+	return false
+}
+
+// GetAlgorithmDetails retrieves a set of details for a given v1.KnownSignatureAlgorithm flag that allows users to
+// introspect the public key algorithm, hash algorithm and more. Only the algorithms that are permitted by the registry
+// are returned.
+func (registryConfig AlgorithmRegistryConfig) GetAlgorithmDetails(signatureAlgorithm v1.KnownSignatureAlgorithm) (AlgorithmDetails, error) {
+	for _, detail := range registryConfig.permittedAlgorithms {
+		if detail.GetSignatureAlgorithm() == signatureAlgorithm {
+			return detail, nil
+		}
+	}
+	return nil, fmt.Errorf("could not find permitted algorithm details for known signature algorithm: %s", signatureAlgorithm)
+}
+
+// ListPermittedAlgorithms returns a list of permitted algorithms for a given registry config.
+func (registryConfig AlgorithmRegistryConfig) ListPermittedAlgorithms() []v1.KnownSignatureAlgorithm {
+	permittedAlgorithms := make([]v1.KnownSignatureAlgorithm, 0, len(registryConfig.permittedAlgorithms))
+	for _, algorithm := range registryConfig.permittedAlgorithms {
+		permittedAlgorithms = append(permittedAlgorithms, algorithm.GetSignatureAlgorithm())
+	}
+	return permittedAlgorithms
+}
+
+// HasAlgorithmDetails checks whether a given v1.KnownSignatureAlgorithm flag is permitted by the registry.
+func (registryConfig AlgorithmRegistryConfig) HasAlgorithmDetails(signatureAlgorithm v1.KnownSignatureAlgorithm) bool {
+	_, err := registryConfig.GetAlgorithmDetails(signatureAlgorithm)
+	return err == nil
 }
 
 // FormatSignatureAlgorithmFlag formats a v1.KnownSignatureAlgorithm to a string that conforms to the conventions of CLI
