@@ -62,11 +62,25 @@ type AlgorithmDetails interface {
 }
 
 type algorithmDetailsImpl struct {
+	// knownAlgorithm is the signature algorithm that the following details refer to.
 	knownAlgorithm v1.KnownSignatureAlgorithm
-	keyType        PublicKeyType
-	hashType       crypto.Hash
+
+	// keyType is the public key algorithm being used.
+	keyType PublicKeyType
+
+	// hashType is the hash algorithm being used.
+	hashType crypto.Hash
+
+	// extraKeyParams contains any extra parameters required to check a given public key against this entry.
+	//
+	// The underlying type of these parameters is dependent on the keyType.
+	// For example, ECDSA algorithms will store an elliptic curve here whereas, RSA keys will store the key size.
+	// Algorithms that don't require any extra parameters leave this set to nil.
 	extraKeyParams interface{}
-	flagValue      string
+
+	// flagValue is a string representation of the signature algorithm that follows the naming conventions of CLI
+	// arguments that are used for Sigstore services.
+	flagValue string
 }
 
 func (a algorithmDetailsImpl) GetSignatureAlgorithm() v1.KnownSignatureAlgorithm {
@@ -222,8 +236,8 @@ func (registryConfig AlgorithmRegistryConfig) HasAlgorithmDetails(signatureAlgor
 	return err == nil
 }
 
-// FormatSignatureAlgorithmFlag formats a v1.KnownSignatureAlgorithm to a string that conforms to the conventions of CLI
-// arguments that are used for Sigstore services.
+// FormatSignatureAlgorithmFlag formats a v1.KnownSignatureAlgorithm to a string that conforms to the naming conventions
+// of CLI arguments that are used for Sigstore services.
 func FormatSignatureAlgorithmFlag(algorithm v1.KnownSignatureAlgorithm) (string, error) {
 	for _, a := range algorithmDetails {
 		if a.GetSignatureAlgorithm() == algorithm {
