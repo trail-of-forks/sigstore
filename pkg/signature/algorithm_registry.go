@@ -57,7 +57,7 @@ type AlgorithmDetails interface {
 	// Otherwise, an error is returned.
 	GetECDSACurve() (*elliptic.Curve, error)
 
-	checkKey(crypto.PublicKey) bool
+	checkKey(crypto.PublicKey) (bool, error)
 	checkHash(crypto.Hash) bool
 }
 
@@ -87,7 +87,8 @@ func (a algorithmDetailsImpl) GetRSAKeySize() (RSAKeySize, error) {
 	}
 	rsaKeySize, ok := a.extraKeyParams.(RSAKeySize)
 	if !ok {
-		panic("unable to retrieve key size for RSA, malformed algorithm details?")
+		// This should be unreachable.
+		return 0, fmt.Errorf("unable to retrieve key size for RSA, malformed algorithm details?: %T", a.keyType)
 	}
 	return rsaKeySize, nil
 }
@@ -98,38 +99,39 @@ func (a algorithmDetailsImpl) GetECDSACurve() (*elliptic.Curve, error) {
 	}
 	ecdsaCurve, ok := a.extraKeyParams.(elliptic.Curve)
 	if !ok {
-		panic("unable to retrieve curve for ECDSA, malformed algorithm details?")
+		// This should be unreachable.
+		return nil, fmt.Errorf("unable to retrieve curve for ECDSA, malformed algorithm details?: %T", a.keyType)
 	}
 	return &ecdsaCurve, nil
 }
 
-func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) bool {
+func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) (bool, error) {
 	switch a.keyType {
 	case RSA:
 		rsaKey, ok := pubKey.(rsa.PublicKey)
 		if !ok {
-			return false
+			return false, nil
 		}
 		keySize, err := a.GetRSAKeySize()
 		if err != nil {
-			panic(err)
+			return false, err
 		}
-		return rsaKey.Size() == int(keySize)
+		return rsaKey.Size() == int(keySize), nil
 	case ECDSA:
 		ecdsaKey, ok := pubKey.(ecdsa.PublicKey)
 		if !ok {
-			return false
+			return false, nil
 		}
 		curve, err := a.GetECDSACurve()
 		if err != nil {
-			panic(err)
+			return false, err
 		}
-		return ecdsaKey.Curve == *curve
+		return ecdsaKey.Curve == *curve, nil
 	case ED25519:
 		_, ok := pubKey.(ed25519.PublicKey)
-		return ok
+		return ok, nil
 	}
-	panic("unreachable")
+	return false, fmt.Errorf("unrecognized key type: %T", a.keyType)
 }
 
 func (a algorithmDetailsImpl) checkHash(hashType crypto.Hash) bool {
@@ -180,13 +182,17 @@ func NewAlgorithmRegistryConfig(algorithmConfig []v1.KnownSignatureAlgorithm) (*
 }
 
 // IsAlgorithmPermitted checks whether a given public key/hash algorithm combination is permitted by a registry config.
-func (registryConfig AlgorithmRegistryConfig) IsAlgorithmPermitted(key crypto.PublicKey, hash crypto.Hash) bool {
+func (registryConfig AlgorithmRegistryConfig) IsAlgorithmPermitted(key crypto.PublicKey, hash crypto.Hash) (bool, error) {
 	for _, algorithm := range registryConfig.permittedAlgorithms {
-		if algorithm.checkKey(key) && algorithm.checkHash(hash) {
-			return true
+		keyMatch, err := algorithm.checkKey(key)
+		if err != nil {
+			return false, err
+		}
+		if keyMatch && algorithm.checkHash(hash) {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // GetAlgorithmDetails retrieves a set of details for a given v1.KnownSignatureAlgorithm flag that allows users to
