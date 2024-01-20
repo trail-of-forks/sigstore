@@ -138,7 +138,7 @@ func TestSignatureAlgorithmFlagRoundtrip(t *testing.T) {
 		if err != nil {
 			t.Errorf("unexpected error formatting signature algorithm flag: %v", err)
 		}
-		actualFlags = append(actualFlags, *flag)
+		actualFlags = append(actualFlags, flag)
 	}
 
 	// Check that the flags look ok.

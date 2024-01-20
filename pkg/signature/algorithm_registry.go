@@ -224,13 +224,13 @@ func (registryConfig AlgorithmRegistryConfig) HasAlgorithmDetails(signatureAlgor
 
 // FormatSignatureAlgorithmFlag formats a v1.KnownSignatureAlgorithm to a string that conforms to the conventions of CLI
 // arguments that are used for Sigstore services.
-func FormatSignatureAlgorithmFlag(algorithm v1.KnownSignatureAlgorithm) (*string, error) {
+func FormatSignatureAlgorithmFlag(algorithm v1.KnownSignatureAlgorithm) (string, error) {
 	for _, a := range algorithmDetails {
 		if a.GetSignatureAlgorithm() == algorithm {
-			return &a.flagValue, nil
+			return a.flagValue, nil
 		}
 	}
-	return nil, fmt.Errorf("could not find matching flag for signature algorithm: %s", algorithm)
+	return "", fmt.Errorf("could not find matching flag for signature algorithm: %s", algorithm)
 }
 
 // ParseSignatureAlgorithmFlag parses a string produced by FormatSignatureAlgorithmFlag and returns the corresponding
