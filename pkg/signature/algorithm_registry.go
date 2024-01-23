@@ -122,7 +122,7 @@ func (a algorithmDetailsImpl) GetECDSACurve() (*elliptic.Curve, error) {
 func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) (bool, error) {
 	switch a.keyType {
 	case RSA:
-		rsaKey, ok := pubKey.(rsa.PublicKey)
+		rsaKey, ok := pubKey.(*rsa.PublicKey)
 		if !ok {
 			return false, nil
 		}
@@ -132,7 +132,7 @@ func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) (bool, error) {
 		}
 		return rsaKey.Size() == int(keySize), nil
 	case ECDSA:
-		ecdsaKey, ok := pubKey.(ecdsa.PublicKey)
+		ecdsaKey, ok := pubKey.(*ecdsa.PublicKey)
 		if !ok {
 			return false, nil
 		}

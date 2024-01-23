@@ -65,7 +65,7 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error creating ecdsa key: %v", err)
 	}
-	isPermitted, err := config.IsAlgorithmPermitted(ecdsaKey.PublicKey, crypto.SHA256)
+	isPermitted, err := config.IsAlgorithmPermitted(&ecdsaKey.PublicKey, crypto.SHA256)
 	if err != nil {
 		t.Errorf("unexpected error checking registry for ecdsa-sha2-256-nistp256: %v", err)
 	}
@@ -90,7 +90,7 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error creating rsa key: %v", err)
 	}
-	isPermitted, err = config.IsAlgorithmPermitted(rsaKey.PublicKey, crypto.SHA256)
+	isPermitted, err = config.IsAlgorithmPermitted(&rsaKey.PublicKey, crypto.SHA256)
 	if err != nil {
 		t.Errorf("unexpected error checking registry for rsa: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 	}
 
 	// Try some permitted public key algorithms with incorrect hash algorithms.
-	isPermitted, err = config.IsAlgorithmPermitted(ecdsaKey.PublicKey, crypto.SHA512)
+	isPermitted, err = config.IsAlgorithmPermitted(&ecdsaKey.PublicKey, crypto.SHA512)
 	if err != nil {
 		t.Errorf("unexpected error checking registry for ecdsa with wrong hash: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("unexpected error creating ecdsa p384 key: %v", err)
 	}
-	isPermitted, err = config.IsAlgorithmPermitted(ecda384Key.PublicKey, crypto.SHA256)
+	isPermitted, err = config.IsAlgorithmPermitted(&ecda384Key.PublicKey, crypto.SHA256)
 	if err != nil {
 		t.Errorf("unexpected error checking registry for ed25519 with wrong curve")
 	}
