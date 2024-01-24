@@ -33,7 +33,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0 // indirect
-	github.com/sigstore/protobuf-specs v0.2.2-0.20240118022641-cea4265fd6c5 // indirect
+	github.com/sigstore/protobuf-specs v0.3.0-beta.2 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	golang.org/x/crypto v0.18.0 // indirect
 	golang.org/x/net v0.18.0 // indirect

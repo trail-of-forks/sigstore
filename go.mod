@@ -13,7 +13,7 @@ require (
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 	github.com/secure-systems-lab/go-securesystemslib v0.8.0
 	github.com/segmentio/ksuid v1.0.4
-	github.com/sigstore/protobuf-specs v0.2.2-0.20240118022641-cea4265fd6c5
+	github.com/sigstore/protobuf-specs v0.3.0-beta.2
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/stretchr/testify v1.8.4
 	github.com/theupdateframework/go-tuf v0.7.0
