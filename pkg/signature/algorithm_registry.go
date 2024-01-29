@@ -130,7 +130,7 @@ func (a algorithmDetailsImpl) checkKey(pubKey crypto.PublicKey) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		return rsaKey.Size() == int(keySize), nil
+		return rsaKey.Size() * 8 == int(keySize), nil
 	case ECDSA:
 		ecdsaKey, ok := pubKey.(*ecdsa.PublicKey)
 		if !ok {
