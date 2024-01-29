@@ -55,7 +55,7 @@ func TestGetAlgorithmDetails(t *testing.T) {
 }
 
 func TestAlgorithmRegistryConfig(t *testing.T) {
-	config, err := NewAlgorithmRegistryConfig([]v1.KnownSignatureAlgorithm{v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256, v1.KnownSignatureAlgorithm_ED25519})
+	config, err := NewAlgorithmRegistryConfig([]v1.KnownSignatureAlgorithm{v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256, v1.KnownSignatureAlgorithm_ED25519, v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_2048_SHA256})
 	if err != nil {
 		t.Errorf("unexpected error creating algorithm registry config: %v", err)
 	}
@@ -85,17 +85,16 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 		t.Errorf("unexpected error permitting ed25519")
 	}
 
-	// Try some algorithms that aren't permitted.
-	rsaKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Errorf("unexpected error creating rsa key: %v", err)
 	}
 	isPermitted, err = config.IsAlgorithmPermitted(&rsaKey.PublicKey, crypto.SHA256)
 	if err != nil {
-		t.Errorf("unexpected error checking registry for rsa: %v", err)
+		t.Errorf("unexpected error checking registry for rsa-sign-pkcs1-2048-sha256: %v", err)
 	}
-	if isPermitted {
-		t.Errorf("unexpected success permitting rsa")
+	if !isPermitted {
+		t.Errorf("unexpected error permitting rsa-sign-pkcs1-2048-sha256")
 	}
 
 	// Try some permitted public key algorithms with incorrect hash algorithms.
@@ -113,6 +112,13 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 	if isPermitted {
 		t.Errorf("unexpected success permitting ed25519 with wrong hash")
 	}
+	isPermitted, err = config.IsAlgorithmPermitted(&rsaKey.PublicKey, crypto.SHA512)
+	if err != nil {
+		t.Errorf("unexpected error checking registry for rsa with wrong hash: %v", err)
+	}
+	if isPermitted {
+		t.Errorf("unexpected success permitting rsa with wrong hash")
+	}
 
 	// Try an ECDSA key with the wrong curve.
 	ecda384Key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
@@ -125,6 +131,19 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 	}
 	if isPermitted {
 		t.Errorf("unexpected success permitting ed25519 with wrong curve")
+	}
+
+	// Try an RSA key with the wrong size.
+	rsa4096Key, err := rsa.GenerateKey(rand.Reader, 4096)
+	if err != nil {
+		t.Errorf("unexpected error creating rsa key: %v", err)
+	}
+	isPermitted, err = config.IsAlgorithmPermitted(&rsa4096Key.PublicKey, crypto.SHA256)
+	if err != nil {
+		t.Errorf("unexpected error checking registry for rsa with wrong size: %v", err)
+	}
+	if isPermitted {
+		t.Errorf("unexpected success permitting rsa with wrong size")
 	}
 }
 
