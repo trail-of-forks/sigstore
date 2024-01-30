@@ -35,7 +35,7 @@ const (
 	ED25519                      // ED25519 public key
 )
 
-// RSAKeySize represents the size of an RSA public key.
+// RSAKeySize represents the size of an RSA public key in bits.
 type RSAKeySize int
 
 // AlgorithmDetails exposes relevant information for a given signature algorithm.
