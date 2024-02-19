@@ -28,11 +28,11 @@ import (
 )
 
 func TestGetAlgorithmDetails(t *testing.T) {
-	details, err := GetAlgorithmDetails(v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256)
+	details, err := GetAlgorithmDetails(v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256)
 	if err != nil {
 		t.Errorf("unexpected error getting algorithm details: %v", err)
 	}
-	if details.GetSignatureAlgorithm() != v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256 {
+	if details.GetSignatureAlgorithm() != v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256 {
 		t.Errorf("unexpected signature algorithm")
 	}
 	if details.GetKeyType() != ECDSA {
@@ -55,7 +55,11 @@ func TestGetAlgorithmDetails(t *testing.T) {
 }
 
 func TestAlgorithmRegistryConfig(t *testing.T) {
-	config, err := NewAlgorithmRegistryConfig([]v1.KnownSignatureAlgorithm{v1.KnownSignatureAlgorithm_ECDSA_SHA2_256_NISTP256, v1.KnownSignatureAlgorithm_ED25519, v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_2048_SHA256})
+	config, err := NewAlgorithmRegistryConfig([]v1.PublicKeyDetails{
+		v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
+		v1.PublicKeyDetails_PKIX_ED25519,
+		v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256,
+	})
 	if err != nil {
 		t.Errorf("unexpected error creating algorithm registry config: %v", err)
 	}
@@ -148,7 +152,11 @@ func TestAlgorithmRegistryConfig(t *testing.T) {
 }
 
 func TestSignatureAlgorithmFlagRoundtrip(t *testing.T) {
-	expectedEnums := []v1.KnownSignatureAlgorithm{v1.KnownSignatureAlgorithm_ECDSA_SHA2_512_NISTP521, v1.KnownSignatureAlgorithm_RSA_SIGN_PKCS1_2048_SHA256, v1.KnownSignatureAlgorithm_ED25519_PH}
+	expectedEnums := []v1.PublicKeyDetails{
+		v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512,
+		v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256,
+		v1.PublicKeyDetails_PKIX_ED25519_PH,
+	}
 
 	// Format enums as flags.
 	actualFlags := make([]string, 0, len(expectedEnums))
@@ -170,7 +178,7 @@ func TestSignatureAlgorithmFlagRoundtrip(t *testing.T) {
 	}
 
 	// Convert back to enums.
-	actualEnums := make([]v1.KnownSignatureAlgorithm, 0, len(expectedEnums))
+	actualEnums := make([]v1.PublicKeyDetails, 0, len(expectedEnums))
 	for _, actualFlag := range actualFlags {
 		actualEnum, err := ParseSignatureAlgorithmFlag(actualFlag)
 		if err != nil {
