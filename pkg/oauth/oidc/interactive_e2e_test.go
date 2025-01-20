@@ -25,15 +25,30 @@ import (
 
 	coreoidc "github.com/coreos/go-oidc/v3/oidc"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"golang.org/x/oauth2"
 )
 
+type stringAsBool bool
+
+func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
+	switch string(b) {
+	case "true", `"true"`, "True", `"True"`:
+		*sb = true
+	case "false", `"false"`, "False", `"False"`:
+		*sb = false
+	default:
+		return errors.New("invalid value for boolean")
+	}
+	return nil
+}
+
 type claims struct {
-	Email    string `json:"email"`
-	Verified bool   `json:"email_verified"`
-	Subject  string `json:"sub"`
+	Email    string       `json:"email"`
+	Verified stringAsBool `json:"email_verified"`
+	Subject  string       `json:"sub"`
 }
 
 func identityFromClaims(c claims) (string, error) {
@@ -97,7 +112,8 @@ func (suite *InteractiveOIDCSuite) TestInteractiveIDTokenSource() {
 
 	go func() {
 		authCodeURL := <-urlCh
-		page := rod.New().MustConnect().MustPage(authCodeURL)
+		launcher := launcher.New().NoSandbox(true).MustLaunch()
+		page := rod.New().ControlURL(launcher).MustConnect().MustPage(authCodeURL)
 		page.MustElement("body > div.dex-container > div > div > div:nth-child(2) > a > button").MustClick()
 	}()
 
