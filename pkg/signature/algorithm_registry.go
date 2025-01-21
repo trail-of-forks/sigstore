@@ -30,9 +30,12 @@ import (
 type PublicKeyType uint
 
 const (
-	RSA     PublicKeyType = iota // RSA public key
-	ECDSA                        // ECDSA public key
-	ED25519                      // ED25519 public key
+	// RSA public key
+	RSA PublicKeyType = iota
+	// ECDSA public key
+	ECDSA
+	// ED25519 public key
+	ED25519
 )
 
 // RSAKeySize represents the size of an RSA public key in bits.
