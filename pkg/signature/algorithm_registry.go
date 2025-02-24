@@ -200,7 +200,7 @@ var supportedAlgorithms = []algorithmDetailsImpl{
 	{v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256, ECDSA, crypto.SHA256, elliptic.P256(), "ecdsa-sha2-256-nistp256"},
 	{v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384, ECDSA, crypto.SHA384, elliptic.P384(), "ecdsa-sha2-384-nistp384"},
 	{v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512, ECDSA, crypto.SHA512, elliptic.P521(), "ecdsa-sha2-512-nistp521"},
-	{v1.PublicKeyDetails_PKIX_ED25519, ED25519, crypto.Hash(0), nil, "ed25519"},
+	{v1.PublicKeyDetails_PKIX_ED25519, ED25519, crypto.SHA512, nil, "ed25519"},
 	{v1.PublicKeyDetails_PKIX_ED25519_PH, ED25519, crypto.SHA512, nil, "ed25519-ph"},
 }
 
