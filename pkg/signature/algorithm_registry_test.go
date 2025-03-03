@@ -195,3 +195,116 @@ func TestSignatureAlgorithmFlagRoundtrip(t *testing.T) {
 		}
 	}
 }
+
+func TestGetDefaultAlgorithmDetailForPublicKey(t *testing.T) {
+	tts := []struct {
+		name              string
+		key               func() (crypto.PublicKey, error)
+		expectedAlgorithm v1.PublicKeyDetails
+		expectedHashType  crypto.Hash
+	}{
+		{
+			name: "ecdsa-p256",
+			key: func() (crypto.PublicKey, error) {
+				key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+				if err != nil {
+					t.Fatalf("unexpected error creating ecdsa key: %v", err)
+				}
+				return &key.PublicKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256,
+			expectedHashType:  crypto.SHA256,
+		},
+		{
+			name: "ecdsa-p384",
+			key: func() (crypto.PublicKey, error) {
+				key, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+				if err != nil {
+					t.Fatalf("unexpected error creating ecdsa key: %v", err)
+				}
+				return &key.PublicKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384,
+			expectedHashType:  crypto.SHA384,
+		},
+		{
+			name: "ecdsa-p521",
+			key: func() (crypto.PublicKey, error) {
+				key, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+				if err != nil {
+					t.Fatalf("unexpected error creating ecdsa key: %v", err)
+				}
+				return &key.PublicKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512,
+			expectedHashType:  crypto.SHA512,
+		},
+		{
+			name: "rsa-2048",
+			key: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 2048)
+				if err != nil {
+					t.Fatalf("unexpected error creating rsa key: %v", err)
+				}
+				return &key.PublicKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256,
+			expectedHashType:  crypto.SHA256,
+		},
+		{
+			name: "rsa-3072",
+			key: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 3072)
+				if err != nil {
+					t.Fatalf("unexpected error creating rsa key: %v", err)
+				}
+				return &key.PublicKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256,
+			expectedHashType:  crypto.SHA256,
+		},
+		{
+			name: "rsa-4096",
+			key: func() (crypto.PublicKey, error) {
+				key, err := rsa.GenerateKey(rand.Reader, 4096)
+				if err != nil {
+					t.Fatalf("unexpected error creating rsa key: %v", err)
+				}
+				return &key.PublicKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256,
+			expectedHashType:  crypto.SHA256,
+		},
+		{
+			name: "ed25519",
+			key: func() (crypto.PublicKey, error) {
+				pubKey, _, err := ed25519.GenerateKey(rand.Reader)
+				if err != nil {
+					t.Fatalf("unexpected error creating ed25519 key: %v", err)
+				}
+				return pubKey, nil
+			},
+			expectedAlgorithm: v1.PublicKeyDetails_PKIX_ED25519_PH,
+			expectedHashType:  crypto.SHA512,
+		},
+	}
+
+	for _, tt := range tts {
+		t.Run(tt.name, func(t *testing.T) {
+			pubKey, err := tt.key()
+			if err != nil {
+				t.Fatalf("unexpected error creating public key: %v", err)
+			}
+			details, err := GetDefaultAlgorithmDetailsForPublicKey(pubKey)
+			if err != nil {
+				t.Errorf("unexpected error getting default algorithm detail for public key: %v", err)
+			}
+			if details.GetSignatureAlgorithm() != tt.expectedAlgorithm {
+				t.Errorf("unexpected algorithm, expected %s, got %s", tt.expectedAlgorithm, details.GetSignatureAlgorithm())
+			}
+			if details.GetHashType() != tt.expectedHashType {
+				t.Errorf("unexpected hash type, expected %s, got %s", tt.expectedHashType, details.GetHashType())
+			}
+		})
+	}
+}
