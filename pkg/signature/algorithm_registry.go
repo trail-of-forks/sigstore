@@ -36,15 +36,51 @@ const (
 	ECDSA
 	// ED25519 public key
 	ED25519
+	// UNKNOWN public key
+	UNKNOWN
 )
 
 // RSAKeySize represents the size of an RSA public key in bits.
 type RSAKeySize int
 
+type PublicKeyId struct {
+	publicKeyType PublicKeyType
+	rsaKeySize    RSAKeySize
+	ecdsaCurve    elliptic.Curve
+}
+
+func RSAPublicKeyId(keySize RSAKeySize) PublicKeyId {
+	return PublicKeyId{RSA, keySize, nil}
+}
+
+func ECDSAPublicKeyId(curve elliptic.Curve) PublicKeyId {
+	return PublicKeyId{ECDSA, 0, curve}
+}
+
+func ED25519PublicKeyId() PublicKeyId {
+	return PublicKeyId{ED25519, 0, nil}
+}
+
+func PublicKeyIdFromPublicKey(key crypto.PublicKey) (PublicKeyId, error) {
+	switch key := key.(type) {
+	case *rsa.PublicKey:
+		return RSAPublicKeyId(RSAKeySize(key.N.BitLen())), nil
+	case *ecdsa.PublicKey:
+		return ECDSAPublicKeyId(key.Curve), nil
+	case ed25519.PublicKey:
+		return ED25519PublicKeyId(), nil
+	default:
+		return PublicKeyId{}, fmt.Errorf("unsupported public key type: %T", key)
+	}
+}
+
 // AlgorithmDetails exposes relevant information for a given signature algorithm.
 type AlgorithmDetails interface {
 	// GetSignatureAlgorithm returns the algorithm registry.
 	GetSignatureAlgorithm() v1.PublicKeyDetails
+
+	// GetPublicKeyId returns the public key id for the given signature algorithm.
+	GetPublicKeyId() PublicKeyId
 
 	// GetKeyType returns the public key algorithm for the given signature algorithm.
 	GetKeyType() PublicKeyType
@@ -71,18 +107,11 @@ type algorithmDetailsImpl struct {
 	// knownAlgorithm is the signature algorithm that the following details refer to.
 	knownAlgorithm v1.PublicKeyDetails
 
-	// keyType is the public key algorithm being used.
-	keyType PublicKeyType
+	// keyId is an id to identify the public key.
+	keyId PublicKeyId
 
 	// hashType is the hash algorithm being used.
 	hashType crypto.Hash
-
-	// extraKeyParams contains any extra parameters required to check a given public key against this entry.
-	//
-	// The underlying type of these parameters is dependent on the keyType.
-	// For example, ECDSA algorithms will store an elliptic curve here whereas, RSA keys will store the key size.
-	// Algorithms that don't require any extra parameters leave this set to nil.
-	extraKeyParams interface{}
 
 	// flagValue is a string representation of the signature algorithm that follows the naming conventions of CLI
 	// arguments that are used for Sigstore services.
@@ -93,8 +122,12 @@ func (a algorithmDetailsImpl) GetSignatureAlgorithm() v1.PublicKeyDetails {
 	return a.knownAlgorithm
 }
 
+func (a algorithmDetailsImpl) GetPublicKeyId() PublicKeyId {
+	return a.keyId
+}
+
 func (a algorithmDetailsImpl) GetKeyType() PublicKeyType {
-	return a.keyType
+	return a.keyId.publicKeyType
 }
 
 func (a algorithmDetailsImpl) GetHashType() crypto.Hash {
@@ -102,31 +135,21 @@ func (a algorithmDetailsImpl) GetHashType() crypto.Hash {
 }
 
 func (a algorithmDetailsImpl) GetRSAKeySize() (RSAKeySize, error) {
-	if a.keyType != RSA {
-		return 0, fmt.Errorf("unable to retrieve RSA key size for key type: %T", a.keyType)
+	if a.keyId.publicKeyType != RSA {
+		return 0, fmt.Errorf("unable to retrieve RSA key size for key type: %T", a.keyId.publicKeyType)
 	}
-	rsaKeySize, ok := a.extraKeyParams.(RSAKeySize)
-	if !ok {
-		// This should be unreachable.
-		return 0, fmt.Errorf("unable to retrieve key size for RSA, malformed algorithm details?: %T", a.keyType)
-	}
-	return rsaKeySize, nil
+	return a.keyId.rsaKeySize, nil
 }
 
 func (a algorithmDetailsImpl) GetECDSACurve() (*elliptic.Curve, error) {
-	if a.keyType != ECDSA {
-		return nil, fmt.Errorf("unable to retrieve ECDSA curve for key type: %T", a.keyType)
+	if a.keyId.publicKeyType != ECDSA {
+		return nil, fmt.Errorf("unable to retrieve ECDSA curve for key type: %T", a.keyId.publicKeyType)
 	}
-	ecdsaCurve, ok := a.extraKeyParams.(elliptic.Curve)
-	if !ok {
-		// This should be unreachable.
-		return nil, fmt.Errorf("unable to retrieve curve for ECDSA, malformed algorithm details?: %T", a.keyType)
-	}
-	return &ecdsaCurve, nil
+	return &a.keyId.ecdsaCurve, nil
 }
 
 func (a algorithmDetailsImpl) IsValidPrivateKey(privKey crypto.PrivateKey) (bool, error) {
-	switch a.keyType {
+	switch a.keyId.publicKeyType {
 	case RSA:
 		rsaKey, ok := privKey.(*rsa.PrivateKey)
 		if !ok {
@@ -151,11 +174,11 @@ func (a algorithmDetailsImpl) IsValidPrivateKey(privKey crypto.PrivateKey) (bool
 		_, ok := privKey.(ed25519.PrivateKey)
 		return ok, nil
 	}
-	return false, fmt.Errorf("unrecognized key type: %T", a.keyType)
+	return false, fmt.Errorf("unrecognized key type: %T", a.keyId.publicKeyType)
 }
 
 func (a algorithmDetailsImpl) IsValidPublicKey(pubKey crypto.PublicKey) (bool, error) {
-	switch a.keyType {
+	switch a.keyId.publicKeyType {
 	case RSA:
 		rsaKey, ok := pubKey.(*rsa.PublicKey)
 		if !ok {
@@ -180,7 +203,7 @@ func (a algorithmDetailsImpl) IsValidPublicKey(pubKey crypto.PublicKey) (bool, e
 		_, ok := pubKey.(ed25519.PublicKey)
 		return ok, nil
 	}
-	return false, fmt.Errorf("unrecognized key type: %T", a.keyType)
+	return false, fmt.Errorf("unrecognized key type: %T", a.keyId.publicKeyType)
 }
 
 func (a algorithmDetailsImpl) checkHash(hashType crypto.Hash) bool {
@@ -191,17 +214,17 @@ func (a algorithmDetailsImpl) checkHash(hashType crypto.Hash) bool {
 // list, including PKCS1v1.5 encoded RSA. Refer to the v1.PublicKeyDetails enum
 // for more details.
 var supportedAlgorithms = []algorithmDetailsImpl{
-	{v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256, RSA, crypto.SHA256, RSAKeySize(2048), "rsa-sign-pkcs1-2048-sha256"},
-	{v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256, RSA, crypto.SHA256, RSAKeySize(3072), "rsa-sign-pkcs1-3072-sha256"},
-	{v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256, RSA, crypto.SHA256, RSAKeySize(4096), "rsa-sign-pkcs1-4096-sha256"},
-	{v1.PublicKeyDetails_PKIX_RSA_PSS_2048_SHA256, RSA, crypto.SHA256, RSAKeySize(2048), "rsa-sign-pss-2048-sha256"},
-	{v1.PublicKeyDetails_PKIX_RSA_PSS_3072_SHA256, RSA, crypto.SHA256, RSAKeySize(3072), "rsa-sign-pss-3072-sha256"},
-	{v1.PublicKeyDetails_PKIX_RSA_PSS_4096_SHA256, RSA, crypto.SHA256, RSAKeySize(4096), "rsa-sign-pss-4092-sha256"},
-	{v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256, ECDSA, crypto.SHA256, elliptic.P256(), "ecdsa-sha2-256-nistp256"},
-	{v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384, ECDSA, crypto.SHA384, elliptic.P384(), "ecdsa-sha2-384-nistp384"},
-	{v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512, ECDSA, crypto.SHA512, elliptic.P521(), "ecdsa-sha2-512-nistp521"},
-	{v1.PublicKeyDetails_PKIX_ED25519, ED25519, crypto.SHA512, nil, "ed25519"},
-	{v1.PublicKeyDetails_PKIX_ED25519_PH, ED25519, crypto.SHA512, nil, "ed25519-ph"},
+	{v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_2048_SHA256, RSAPublicKeyId(2048), crypto.SHA256, "rsa-sign-pkcs1-2048-sha256"},
+	{v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_3072_SHA256, RSAPublicKeyId(3072), crypto.SHA256, "rsa-sign-pkcs1-3072-sha256"},
+	{v1.PublicKeyDetails_PKIX_RSA_PKCS1V15_4096_SHA256, RSAPublicKeyId(4096), crypto.SHA256, "rsa-sign-pkcs1-4096-sha256"},
+	{v1.PublicKeyDetails_PKIX_RSA_PSS_2048_SHA256, RSAPublicKeyId(2048), crypto.SHA256, "rsa-sign-pss-2048-sha256"},
+	{v1.PublicKeyDetails_PKIX_RSA_PSS_3072_SHA256, RSAPublicKeyId(3072), crypto.SHA256, "rsa-sign-pss-3072-sha256"},
+	{v1.PublicKeyDetails_PKIX_RSA_PSS_4096_SHA256, RSAPublicKeyId(4096), crypto.SHA256, "rsa-sign-pss-4096-sha256"},
+	{v1.PublicKeyDetails_PKIX_ECDSA_P256_SHA_256, ECDSAPublicKeyId(elliptic.P256()), crypto.SHA256, "ecdsa-sha2-256-nistp256"},
+	{v1.PublicKeyDetails_PKIX_ECDSA_P384_SHA_384, ECDSAPublicKeyId(elliptic.P384()), crypto.SHA384, "ecdsa-sha2-384-nistp384"},
+	{v1.PublicKeyDetails_PKIX_ECDSA_P521_SHA_512, ECDSAPublicKeyId(elliptic.P521()), crypto.SHA512, "ecdsa-sha2-512-nistp521"},
+	{v1.PublicKeyDetails_PKIX_ED25519, ED25519PublicKeyId(), crypto.SHA512, "ed25519"},
+	{v1.PublicKeyDetails_PKIX_ED25519_PH, ED25519PublicKeyId(), crypto.SHA512, "ed25519-ph"},
 }
 
 // AlgorithmRegistryConfig represents a set of permitted algorithms for a given Sigstore service or component.
@@ -216,6 +239,21 @@ type AlgorithmRegistryConfig struct {
 // introspect the public key algorithm, hash algorithm and more.
 func GetAlgorithmDetails(knownSignatureAlgorithm v1.PublicKeyDetails) (AlgorithmDetails, error) {
 	return getAlgorithmDetails(knownSignatureAlgorithm)
+}
+
+// GetAlgorithmDetailsForPublicKey retrieves a set of details that are valid for a given public key.
+func GetAlgorithmDetailsForPublicKey(key crypto.PublicKey) ([]AlgorithmDetails, error) {
+	algorithmDetails := []AlgorithmDetails{}
+	for _, detail := range supportedAlgorithms {
+		valid, err := detail.IsValidPublicKey(key)
+		if err != nil {
+			return nil, err
+		}
+		if valid {
+			algorithmDetails = append(algorithmDetails, detail)
+		}
+	}
+	return algorithmDetails, nil
 }
 
 func getAlgorithmDetails(knownSignatureAlgorithm v1.PublicKeyDetails) (*algorithmDetailsImpl, error) {
